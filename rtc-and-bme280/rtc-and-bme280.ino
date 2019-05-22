@@ -11,105 +11,163 @@ RTC_DS1307 RTC;
 #define SEALEVELPRESSURE_HPA (1013.25)
 Adafruit_BME280 bme; // I2C
 
-unsigned long delayTime;
-char toBeLogged[50];
+#define EEPROM_I2C_ID 0x50
+int address = 0;
 
-#include "extEEPROM.h"
-extEEPROM myEEPROM(kbits_32, 1, 64, 0x58);
-unsigned long address = 0;
+unsigned long delayTime;
 
 void setup() {
   /* init console */
-    Serial.begin(9600);
-    Serial.println(F("BME280 test"));
+  Serial.begin(9600);
+  Serial.println(F("BME280 test"));
 
-    /* BME280 initialisation */
-    bool status;
-    status = bme.begin();  
-    if (!status) {
-        Serial.println("Could not find a valid BME280 sensor, check wiring!");
-        while (1);
-    }
-    Serial.println("BME280 sensor initialized");
+  Wire.setClock(400000);
 
-    Serial.println();
+  /* BME280 initialisation */
+  bool status;
+  status = bme.begin();
+  if (!status) {
+    Serial.println("Could not find a valid BME280 sensor, check wiring!");
+    while (1);
+  }
+  Serial.println("BME280 sensor initialized");
 
-    /* TinyRTC initialisation */
-    RTC.begin();
-    if (! RTC.isrunning()) {
-      Serial.println("RTC is NOT running!");
-      RTC.adjust(DateTime(__DATE__, __TIME__));
-    }
+  Serial.println();
+
+  /* TinyRTC initialisation */
+  RTC.begin();
+  if (! RTC.isrunning()) {
+    Serial.println("RTC is NOT running!");
+    RTC.adjust(DateTime(__DATE__, __TIME__));
+  }
+
+  delayTime = 300000;
+  readEeprom();
+}
+
+void readEeprom() {
+  float temp, hum, pressure;
+  uint32_t ts;
+  byte *byte_ts = (byte *)(&ts);
+  byte *byte_temp = (byte *) (&temp);
+  byte *byte_hum = (byte *) (&hum);
+  byte *byte_pressure = (byte *) (&pressure);
+  int i=0;
+
+  Serial.println("Lecture de l'EEprom ...");
+  do {
+    Wire.beginTransmission(EEPROM_I2C_ID);
+    Wire.write((int)(address >> 8));   // MSB
+    Wire.write((int)(address & 0xFF)); // LSB
+    Wire.endTransmission();
+    Wire.requestFrom(EEPROM_I2C_ID,16); // on demande à lire 16 octets
+    // Lecture du timestamp
+    for (int i=0; i<4; i++) {
+      if (Wire.available()) {
+        byte_ts[i] = Wire.read();
+        };
+      }
+      address +=4;
+      // Lecture de la temperature
+    for (int i=0; i<4; i++) {
+      if (Wire.available()) {
+        byte_temp[i] = Wire.read();
+        };
+      }
+      address +=4;
+      //Lecture taux humidite
+      for (int i=0; i<4; i++) {
+      if (Wire.available()) {
+        byte_hum[i] = Wire.read();
+        };
+      }
+      address +=4;
+      //Lecture pression atmosphérique
+      for (int i=0; i<4; i++) {
+      if (Wire.available()) {
+        byte_pressure[i] = Wire.read();
+        };
+      }
+      address +=4;
+  Serial.print("date ");
+  Serial.print(ts, DEC);
+
+  Serial.print(" : Temperature = ");
+  Serial.print(temp);
+  Serial.print(" *C");
   
-    byte i2cStat = myEEPROM.begin(myEEPROM.twiClock100kHz);
-    if ( i2cStat != 0 ) {
-      Serial.println(F("I2C Problem"));
-    }
+  Serial.print(" / Pressure = ");
+  Serial.print(pressure / 100.0F);
+  Serial.print(" hPa");
 
-    delayTime = 5000;
+  Serial.print(" / humidite = ");
+  Serial.print(hum);
+  Serial.println(" %hum");
+
+  } while ( ts > 1546297200 && ts <1893452400 ); // tant que ts est dans l'interval  [01/01/2019 - 01/01/2030](test moisi pour verifier que c'est bien unde datea
+  // on ne trouve plus une date, donc on a lu un enregistrement de trop
+  address -= 16;
+  
 }
 
 void printBME280Values() {
-    Serial.print("Temperature = ");
-    Serial.print(bme.readTemperature());
-    Serial.println(" *C");
+  Serial.print("Temperature = ");
+  Serial.print(bme.readTemperature());
+  Serial.println(" *C");
 
-    Serial.print("Pressure = ");
-    Serial.print(bme.readPressure() / 100.0F);
-    Serial.println(" hPa");
+  Serial.print("Pressure = ");
+  Serial.print(bme.readPressure() / 100.0F);
+  Serial.println(" hPa");
 
-    Serial.print("Approx. Altitude = ");
-    Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
-    Serial.println(" m");
+  Serial.print("Approx. Altitude = ");
+  Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
+  Serial.println(" m");
 
-    Serial.print("Humidity = ");
-    Serial.print(bme.readHumidity());
-    Serial.println(" %");
+  Serial.print("Humidity = ");
+  Serial.print(bme.readHumidity());
+  Serial.println(" %");
 }
 
-void printDateTime(){
-    DateTime now = RTC.now(); 
-    Serial.print(now.year(), DEC);
-    Serial.print('/');
-    Serial.print(now.month(), DEC);
-    Serial.print('/');
-    Serial.print(now.day(), DEC);
-    Serial.print(' ');
-    Serial.print(now.hour(), DEC);
-    Serial.print(':');
-    Serial.print(now.minute(), DEC);
-    Serial.print(':');
-    Serial.print(now.second(), DEC);
-    Serial.println(); 
+void printDateTime() {
+  DateTime now = RTC.now();
+  Serial.print(now.year(), DEC);
+  Serial.print('/');
+  Serial.print(now.month(), DEC);
+  Serial.print('/');
+  Serial.print(now.day(), DEC);
+  Serial.print(' ');
+  Serial.print(now.hour(), DEC);
+  Serial.print(':');
+  Serial.print(now.minute(), DEC);
+  Serial.print(':');
+  Serial.print(now.second(), DEC);
+  Serial.println();
 }
 
 void log2eeprom() {
   uint32_t ts = RTC.now().unixtime();
   float temp = bme.readTemperature();
   float hum = bme.readHumidity();
-  memset(toBeLogged, 0, sizeof(toBeLogged));
-  snprintf(toBeLogged, sizeof(toBeLogged), "%d;%f;%f\n", ts, temp, hum);
-  byte i2cStat = myEEPROM.write(address, toBeLogged, strlen(toBeLogged));
-    if ( i2cStat != 0 ) {
-    //there was a problem
-    Serial.print(F("I2C Problem: "));
-    if ( i2cStat == EEPROM_ADDR_ERR) {
-      Serial.println(F("Wrong address"));
-    } else {
-      Serial.print(F("I2C error: "));
-      Serial.print(i2cStat);
-      Serial.println(F(""));
-    }
-  } else {
-    address += strlen(toBeLogged);
-    Serial.println("Ecriture ok");
-  }
+  float pressure = bme.readPressure();
+  Serial.print("taille de la date : ");
+  Serial.println(sizeof(ts));
+  Serial.print("taille d'un float : ");
+  Serial.println(sizeof(temp));
+  Wire.beginTransmission(EEPROM_I2C_ID);
+  Wire.write((int)((address) >> 8));   // MSB
+  Wire.write((int)((address) & 0xFF)); // LSB
+  Wire.write((byte *)&ts, sizeof(ts)); // write timestamp (4 bytes)
+  Wire.write((byte *)&temp, sizeof(temp)); // write temperature (4 bytes)
+  Wire.write((byte *)&hum, sizeof(hum)); // write humidity (4 bytes)
+  Wire.write((byte *)&pressure, sizeof(pressure)); // write timestamp (4 bytes)
+  Wire.endTransmission();
+  address+=16;
 }
 void loop() {
   printDateTime();
   printBME280Values();
   log2eeprom();
   delay(delayTime);
-  Serial.println(); 
-  Serial.println(); 
+  Serial.println();
+  Serial.println();
 }
