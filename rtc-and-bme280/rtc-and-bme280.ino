@@ -34,6 +34,8 @@ int address = 0;
 
 unsigned long delayTime;
 
+String filename;
+
 void setup() {
   /* init console */
   Serial.begin(9600);
@@ -73,8 +75,8 @@ void setup() {
   dumpEeprom2SD();
 }
 
-char *newCSVfilename() {
-  String filename = "";
+void newCSVfilename() {
+  filename = "";
   DateTime now = RTC.now();
   filename += String(now.year(), DEC);
   filename += String(now.month(), DEC);
@@ -83,7 +85,9 @@ char *newCSVfilename() {
   filename += String(now.hour(), DEC);
   filename += String(now.minute(), DEC);
   filename += String(now.second(), DEC);
-  return filename.c_str();
+  filename += ".csv";
+    Serial.print ("Sauvegardes des données dans le fichier : ");
+  Serial.println(filename);
 }
 
 
@@ -95,8 +99,10 @@ void dumpEeprom2SD() {
   byte *byte_hum = (byte *) (&hum);
   byte *byte_pressure = (byte *) (&pressure);
   int i = 0;
-
-  File dataFile = SD.open(newCSVfilename(), FILE_WRITE);
+  newCSVfilename();
+  Serial.print ("Sauvegardes des données dans le fichier : ");
+  Serial.println(filename);
+  File dataFile = SD.open(filename, FILE_WRITE);
 
 
 
