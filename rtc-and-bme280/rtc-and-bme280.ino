@@ -1,6 +1,22 @@
 /* For I2C communication */
 #include <Wire.h>
 
+// include the SD library:
+#include <SPI.h>
+#include <SD.h>
+
+// set up variables using the SD utility library functions:
+Sd2Card card;
+SdVolume volume;
+SdFile root;
+// change this to match your SD shield or module;
+// Arduino Ethernet shield: pin 4
+// Adafruit SD shields and modules: pin 10
+// Sparkfun SD shield: pin 8
+// MKRZero SD: SDCARD_SS_PIN
+const int chipSelect = 10;
+
+
 /* RTC lib */
 #include "RTClib.h"
 RTC_DS1307 RTC;
@@ -11,6 +27,8 @@ RTC_DS1307 RTC;
 #define SEALEVELPRESSURE_HPA (1013.25)
 Adafruit_BME280 bme; // I2C
 
+// Doc de l'eeprom utilisée (32 Ko) :
+// http://www.belling.com.cn/media/file_object/bel_product/BL24C256A/datasheet/BL24C256A.pdf
 #define EEPROM_I2C_ID 0x50
 int address = 0;
 
@@ -42,17 +60,45 @@ void setup() {
   }
 
   delayTime = 300000;
-  readEeprom();
+
+  Serial.print("Initializing SD card...");
+  // see if the card is present and can be initialized:
+  if (!SD.begin(chipSelect)) {
+    Serial.println("Card failed, or not present");
+    // don't do anything more:
+    while (1);
+  }
+  Serial.println("card initialized.");
+
+  dumpEeprom2SD();
 }
 
-void readEeprom() {
+char *newCSVfilename() {
+  String filename = "";
+  DateTime now = RTC.now();
+  filename += String(now.year(), DEC);
+  filename += String(now.month(), DEC);
+  filename += String(now.day(), DEC);
+  filename += "-";
+  filename += String(now.hour(), DEC);
+  filename += String(now.minute(), DEC);
+  filename += String(now.second(), DEC);
+  return filename.c_str();
+}
+
+
+void dumpEeprom2SD() {
   float temp, hum, pressure;
   uint32_t ts;
   byte *byte_ts = (byte *)(&ts);
   byte *byte_temp = (byte *) (&temp);
   byte *byte_hum = (byte *) (&hum);
   byte *byte_pressure = (byte *) (&pressure);
-  int i=0;
+  int i = 0;
+
+  File dataFile = SD.open(newCSVfilename(), FILE_WRITE);
+
+
 
   Serial.println("Lecture de l'EEprom ...");
   do {
@@ -60,54 +106,64 @@ void readEeprom() {
     Wire.write((int)(address >> 8));   // MSB
     Wire.write((int)(address & 0xFF)); // LSB
     Wire.endTransmission();
-    Wire.requestFrom(EEPROM_I2C_ID,16); // on demande à lire 16 octets
+    Wire.requestFrom(EEPROM_I2C_ID, 16); // on demande à lire 16 octets
     // Lecture du timestamp
-    for (int i=0; i<4; i++) {
+    for (int i = 0; i < 4; i++) {
       if (Wire.available()) {
         byte_ts[i] = Wire.read();
-        };
-      }
-      address +=4;
-      // Lecture de la temperature
-    for (int i=0; i<4; i++) {
+      };
+    }
+    address += 4;
+    // Lecture de la temperature
+    for (int i = 0; i < 4; i++) {
       if (Wire.available()) {
         byte_temp[i] = Wire.read();
-        };
-      }
-      address +=4;
-      //Lecture taux humidite
-      for (int i=0; i<4; i++) {
+      };
+    }
+    address += 4;
+    //Lecture taux humidite
+    for (int i = 0; i < 4; i++) {
       if (Wire.available()) {
         byte_hum[i] = Wire.read();
-        };
-      }
-      address +=4;
-      //Lecture pression atmosphérique
-      for (int i=0; i<4; i++) {
+      };
+    }
+    address += 4;
+    //Lecture pression atmosphérique
+    for (int i = 0; i < 4; i++) {
       if (Wire.available()) {
         byte_pressure[i] = Wire.read();
-        };
-      }
-      address +=4;
-  Serial.print("date ");
-  Serial.print(ts, DEC);
+      };
+    }
+    address += 4;
 
-  Serial.print(" : Temperature = ");
-  Serial.print(temp);
-  Serial.print(" *C");
-  
-  Serial.print(" / Pressure = ");
-  Serial.print(pressure / 100.0F);
-  Serial.print(" hPa");
+    // if the file is available, write to it:
+    if (dataFile) {
+      String toBeLogged="";
 
-  Serial.print(" / humidite = ");
-  Serial.print(hum);
-  Serial.println(" %hum");
+      toBeLogged += String(ts,DEC);
+      toBeLogged +=",";
 
-  } while ( ts > 1546297200 && ts <1893452400 ); // tant que ts est dans l'interval  [01/01/2019 - 01/01/2030](test moisi pour verifier que c'est bien unde datea
-  // on ne trouve plus une date, donc on a lu un enregistrement de trop
-  address -= 16;
-  
+      toBeLogged += String(temp);
+      toBeLogged +=",";
+      
+
+      toBeLogged += String(pressure / 100.0F);
+      toBeLogged +=",";
+
+      toBeLogged += String (hum);
+      dataFile.println(toBeLogged);
+      Serial.print(address, DEC);
+      Serial.print( " : ");
+      Serial.println(toBeLogged);
+    }
+// TODO : 4096 : truc codé en dur, à corriger
+  } while ( ts > 1546297200 && ts < 1893452400 && address <= 4096 ); // tant que ts est dans l'interval  [01/01/2019 - 01/01/2030](test moisi pour verifier que c'est bien unde datea
+  if (dataFile) {
+    dataFile.close();
+  }
+  // on a tout ecrit sur la carte SD, on remet à zero l'adresse où ecrire dans l'eeprom
+  address = 0;
+
 }
 
 void printBME280Values() {
@@ -161,7 +217,10 @@ void log2eeprom() {
   Wire.write((byte *)&hum, sizeof(hum)); // write humidity (4 bytes)
   Wire.write((byte *)&pressure, sizeof(pressure)); // write timestamp (4 bytes)
   Wire.endTransmission();
-  address+=16;
+  address += 16;
+  if (address >= 4096 ) {
+    dumpEeprom2SD();
+    }
 }
 void loop() {
   printDateTime();
