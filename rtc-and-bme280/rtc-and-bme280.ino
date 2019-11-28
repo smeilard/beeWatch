@@ -86,7 +86,7 @@ void newCSVfilename() {
   filename += String(now.minute(), DEC);
   filename += String(now.second(), DEC);
   filename += ".csv";
-    Serial.print ("Sauvegardes des données dans le fichier : ");
+    Serial.print ("Nouveau nom de fichier : ");
   Serial.println(filename);
 }
 
@@ -102,7 +102,10 @@ void dumpEeprom2SD() {
   newCSVfilename();
   Serial.print ("Sauvegardes des données dans le fichier : ");
   Serial.println(filename);
-  File dataFile = SD.open(filename, FILE_WRITE);
+  File dataFile = SD.open(filename.c_str(), FILE_WRITE);
+  if ( dataFile == 0 ) {
+    Serial.println("probleme d'ouverture de fichier");
+  }
 
 
 
@@ -166,6 +169,7 @@ void dumpEeprom2SD() {
   } while ( ts > 1546297200 && ts < 1893452400 && address <= 4096 ); // tant que ts est dans l'interval  [01/01/2019 - 01/01/2030](test moisi pour verifier que c'est bien unde datea
   if (dataFile) {
     dataFile.close();
+    Serial.println ("Fermeture du fichier sauvegardé");
   }
   // on a tout ecrit sur la carte SD, on remet à zero l'adresse où ecrire dans l'eeprom
   address = 0;
