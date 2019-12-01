@@ -34,7 +34,7 @@ int address = 0;
 
 unsigned long delayTime;
 
-String filename;
+char filename[12];
 
 void setup() {
   /* init console */
@@ -76,17 +76,9 @@ void setup() {
 }
 
 void newCSVfilename() {
-  filename = "";
   DateTime now = RTC.now();
-  filename += String(now.year(), DEC);
-  filename += String(now.month(), DEC);
-  filename += String(now.day(), DEC);
-  filename += "-";
-  filename += String(now.hour(), DEC);
-  filename += String(now.minute(), DEC);
-  filename += String(now.second(), DEC);
-  filename += ".csv";
-    Serial.print ("Nouveau nom de fichier : ");
+  sprintf(filename, "%02d%02d%02d%02d.csv", now.year()-2000, now.month(), now.day(), now.hour());
+  Serial.print ("Nouveau nom de fichier : ");
   Serial.println(filename);
 }
 
@@ -102,7 +94,7 @@ void dumpEeprom2SD() {
   newCSVfilename();
   Serial.print ("Sauvegardes des données dans le fichier : ");
   Serial.println(filename);
-  File dataFile = SD.open(filename.c_str(), FILE_WRITE);
+  File dataFile = SD.open(filename, FILE_WRITE);
   if ( dataFile == 0 ) {
     Serial.println("probleme d'ouverture de fichier");
   }
@@ -147,17 +139,16 @@ void dumpEeprom2SD() {
 
     // if the file is available, write to it:
     if (dataFile) {
-      String toBeLogged="";
-
-      toBeLogged += String(ts,DEC);
-      toBeLogged +=",";
+      String toBeLogged = "";
+      toBeLogged += String(ts, DEC);
+      toBeLogged += ",";
 
       toBeLogged += String(temp);
-      toBeLogged +=",";
-      
+      toBeLogged += ",";
+
 
       toBeLogged += String(pressure / 100.0F);
-      toBeLogged +=",";
+      toBeLogged += ",";
 
       toBeLogged += String (hum);
       dataFile.println(toBeLogged);
@@ -165,7 +156,7 @@ void dumpEeprom2SD() {
       Serial.print( " : ");
       Serial.println(toBeLogged);
     }
-// TODO : 4096 : truc codé en dur, à corriger
+    // TODO : 4096 : truc codé en dur, à corriger
   } while ( ts > 1546297200 && ts < 1893452400 && address <= 4096 ); // tant que ts est dans l'interval  [01/01/2019 - 01/01/2030](test moisi pour verifier que c'est bien unde datea
   if (dataFile) {
     dataFile.close();
@@ -230,7 +221,7 @@ void log2eeprom() {
   address += 16;
   if (address >= 4096 ) {
     dumpEeprom2SD();
-    }
+  }
 }
 void loop() {
   printDateTime();
