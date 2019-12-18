@@ -99,8 +99,6 @@ void dumpEeprom2SD() {
     Serial.println("probleme d'ouverture de fichier");
   }
 
-
-
   Serial.println("Lecture de l'EEprom ...");
   do {
     Wire.beginTransmission(EEPROM_I2C_ID);
@@ -167,49 +165,12 @@ void dumpEeprom2SD() {
 
 }
 
-void printBME280Values() {
-  Serial.print("Temperature = ");
-  Serial.print(bme.readTemperature());
-  Serial.println(" *C");
-
-  Serial.print("Pressure = ");
-  Serial.print(bme.readPressure() / 100.0F);
-  Serial.println(" hPa");
-
-  Serial.print("Approx. Altitude = ");
-  Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
-  Serial.println(" m");
-
-  Serial.print("Humidity = ");
-  Serial.print(bme.readHumidity());
-  Serial.println(" %");
-}
-
-void printDateTime() {
-  DateTime now = RTC.now();
-  Serial.print(now.year(), DEC);
-  Serial.print('/');
-  Serial.print(now.month(), DEC);
-  Serial.print('/');
-  Serial.print(now.day(), DEC);
-  Serial.print(' ');
-  Serial.print(now.hour(), DEC);
-  Serial.print(':');
-  Serial.print(now.minute(), DEC);
-  Serial.print(':');
-  Serial.print(now.second(), DEC);
-  Serial.println();
-}
 
 void log2eeprom() {
   uint32_t ts = RTC.now().unixtime();
   float temp = bme.readTemperature();
   float hum = bme.readHumidity();
   float pressure = bme.readPressure();
-  Serial.print("taille de la date : ");
-  Serial.println(sizeof(ts));
-  Serial.print("taille d'un float : ");
-  Serial.println(sizeof(temp));
   Wire.beginTransmission(EEPROM_I2C_ID);
   Wire.write((int)((address) >> 8));   // MSB
   Wire.write((int)((address) & 0xFF)); // LSB
@@ -224,10 +185,6 @@ void log2eeprom() {
   }
 }
 void loop() {
-  printDateTime();
-  printBME280Values();
   log2eeprom();
   delay(delayTime);
-  Serial.println();
-  Serial.println();
 }
