@@ -44,6 +44,7 @@ void setup() {
   Wire.setClock(400000);
 
   /* BME280 initialisation */
+  Serial.print("Initializing BME280 sensor ...");
   bool status;
   status = bme.begin();
   if (!status) {
@@ -52,16 +53,11 @@ void setup() {
   }
   Serial.println("BME280 sensor initialized");
 
-  Serial.println();
-
-  /* TinyRTC initialisation */
+  // pour mettre à jour le composant RTC, lancer le programme d'exemple de la lib rtc
   RTC.begin();
-  if (! RTC.isrunning()) {
-    Serial.println("RTC is NOT running!");
-    RTC.adjust(DateTime(__DATE__, __TIME__));
-  }
 
-  delayTime = 300000;
+  // Nb de millisecondes entre 2 enregistrements des mesures
+  delayTime = 60000;
 
   Serial.print("Initializing SD card...");
   // see if the card is present and can be initialized:
@@ -138,9 +134,23 @@ void dumpEeprom2SD() {
     // if the file is available, write to it:
     if (dataFile) {
       String toBeLogged = "";
-      toBeLogged += String(ts, DEC);
+      DateTime dtTs = new DateTime(ts);
+      toBeLogged += String(dtTs.hour(), DEC);
+      toBeLogged += ":";
+      toBeLogged += String(dtTs.minute(), DEC);
+      toBeLogged += ":";
+      toBeLogged += String(dtTs.second(), DEC);
+      toBeLogged += "-";
+      toBeLogged += String(dtTs.day(), DEC);
+      toBeLogged += "/";
+      toBeLogged += String(dtTs.month(), DEC);
+      toBeLogged += "/";
+      toBeLogged += String(dtTs.year(), DEC);
+      toBeLogged += ":";
+      /*
+      toBeLogged += String(ts);
       toBeLogged += ",";
-
+*/
       toBeLogged += String(temp);
       toBeLogged += ",";
 
@@ -162,9 +172,27 @@ void dumpEeprom2SD() {
   }
   // on a tout ecrit sur la carte SD, on remet à zero l'adresse où ecrire dans l'eeprom
   address = 0;
-
+  clearEeprom();
 }
 
+void clearEeprom() {
+  Serial.println( "Zeroing eeprom ... ");
+  uint32_t z=0;
+  for (int i=0 ; i<1024; i++) {
+    Wire.beginTransmission(EEPROM_I2C_ID);
+    Wire.write((int)((16*i) >> 8));   // MSB
+    Wire.write((int)((16*i) & 0xFF)); // LSB
+    //Wire.write(zero,sizeof(zero));
+    Wire.write(0);
+    Wire.write(0);
+    Wire.write(0);
+    Wire.write(0);
+    Wire.endTransmission();
+    delay(10);
+  }
+  Serial.println( "Eeprom cleared... ");
+
+}
 
 void log2eeprom() {
   uint32_t ts = RTC.now().unixtime();
